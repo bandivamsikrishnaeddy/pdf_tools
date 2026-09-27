@@ -1,0 +1,545 @@
+/* Neobrutalism. Three colours, black ink, hard edges, no gradients.
+   The palette is fixed:
+     Crystalline Depth   #3F8AB1
+     Solar Flare         #FBE449
+     Pulse Prohibition   #F62731
+*/
+
+:root {
+  --blue: #3f8ab1;
+  --yellow: #fbe449;
+  --red: #f62731;
+  --ink: #000000;
+
+  --edge: 3px solid var(--ink);
+  --edge-thick: 4px solid var(--ink);
+  --lift: 6px 6px 0 var(--ink);
+  --lift-sm: 4px 4px 0 var(--ink);
+  --lift-xs: 3px 3px 0 var(--ink);
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--blue);
+  color: var(--ink);
+  font: 15px/1.5 var(--sans);
+  padding: 24px 24px 80px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.masthead {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.title-block {
+  background: var(--yellow);
+  border: var(--edge-thick);
+  box-shadow: var(--lift);
+  padding: 14px 22px 16px;
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+.title-block h1 {
+  margin: 0;
+  font-size: 40px;
+  line-height: 0.94;
+  letter-spacing: -1.6px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.title-block h1 em {
+  font-style: normal;
+  color: var(--red);
+  -webkit-text-stroke: 2px var(--ink);
+}
+
+.title-block p {
+  margin: 8px 0 0;
+  font: 600 12px/1.4 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.badge-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+}
+
+.badge {
+  border: var(--edge);
+  box-shadow: var(--lift-sm);
+  padding: 8px 14px;
+  font: 800 12px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.badge-blue {
+  background: var(--yellow);
+}
+.badge-red {
+  background: var(--red);
+  color: var(--yellow);
+}
+.badge-yellow {
+  background: var(--ink);
+  color: var(--yellow);
+}
+
+/* ----------------------------------------------------------------- panels */
+
+.grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 330px;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  border: var(--edge);
+  box-shadow: var(--lift);
+  background: var(--yellow);
+  margin-bottom: 22px;
+}
+
+.panel > h2 {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--yellow);
+  font: 800 12px/1.2 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.panel.red {
+  background: var(--red);
+}
+.panel.blue {
+  background: var(--yellow);
+}
+
+.panel-body {
+  padding: 14px;
+}
+
+.panel-body.tight {
+  padding: 0;
+}
+
+/* ---------------------------------------------------------------- dropzone */
+
+.drop {
+  border: var(--edge-thick);
+  background: var(--blue);
+  box-shadow: var(--lift-sm);
+  color: var(--ink);
+  padding: 26px 18px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+.drop:hover,
+.drop:focus-visible {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+  outline: none;
+}
+
+.drop.over {
+  background: var(--red);
+  color: var(--yellow);
+}
+
+.drop strong {
+  display: block;
+  font: 800 20px/1.05 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: -0.4px;
+}
+
+.drop span {
+  display: block;
+  margin-top: 7px;
+  font: 600 11px/1.4 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* --------------------------------------------------------------- key/value */
+
+dl.facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0;
+  font: 600 13px/1 var(--mono);
+}
+
+dl.facts dt {
+  padding: 8px 10px;
+  border-top: 2px solid var(--ink);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+dl.facts dd {
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 2px solid var(--ink);
+  text-align: right;
+  font-weight: 800;
+  background: var(--yellow);
+}
+
+dl.facts dt:first-of-type,
+dl.facts dt:first-of-type + dd {
+  border-top: 0;
+}
+
+dl.facts dd.hot {
+  background: var(--red);
+  color: var(--yellow);
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+button {
+  font: 800 12px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 13px;
+  border: var(--edge);
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: var(--lift-xs);
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+
+button:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+button:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+button:disabled {
+  /* Faded yellow reads on the yellow panel and still reads on the red one,
+     where a blue fill would disappear into the background. */
+  background: var(--yellow);
+  color: var(--ink);
+  cursor: not-allowed;
+  opacity: 0.42;
+  box-shadow: none;
+  transform: none;
+}
+
+button.go {
+  background: var(--red);
+  color: var(--yellow);
+}
+
+button.dark {
+  background: var(--ink);
+  color: var(--yellow);
+}
+
+/* ------------------------------------------------------------- page viewer */
+
+.viewer {
+  border: var(--edge);
+  box-shadow: var(--lift);
+  background: var(--ink);
+}
+
+.viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 13px;
+  background: var(--red);
+  color: var(--yellow);
+  font: 800 12px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex-wrap: wrap;
+}
+
+.viewer-head .who {
+  background: var(--ink);
+  color: var(--yellow);
+  padding: 5px 9px;
+  border: 2px solid var(--yellow);
+}
+
+.pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 18px;
+  background: var(--blue);
+  min-height: 220px;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+.sheet {
+  flex: none;
+  border: var(--edge);
+  background: #fff;
+  box-shadow: var(--lift-sm);
+  cursor: pointer;
+  position: relative;
+}
+
+.sheet.sel {
+  outline: 4px solid var(--red);
+  outline-offset: 0;
+}
+
+.sheet canvas {
+  display: block;
+}
+
+.sheet .tagline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px;
+  background: var(--ink);
+  color: var(--yellow);
+  font: 700 10px/1.2 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sheet.sel .tagline {
+  background: var(--red);
+  color: var(--yellow);
+}
+
+.empty-note {
+  padding: 40px 20px;
+  color: var(--yellow);
+  font: 700 13px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ------------------------------------------------------------- search hits */
+
+.search-out {
+  margin-top: 12px;
+  font: 600 12px/1.45 var(--mono);
+}
+
+.search-out .hit {
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  box-shadow: var(--lift-xs);
+}
+
+.search-out .miss {
+  background: var(--red);
+  color: var(--yellow);
+  border: 2px solid var(--ink);
+  padding: 6px 8px;
+  box-shadow: var(--lift-xs);
+}
+
+input[type="text"],
+input[type="search"] {
+  width: 100%;
+  font: 700 14px/1 var(--mono);
+  padding: 10px 11px;
+  border: var(--edge);
+  background: var(--blue);
+  color: var(--ink);
+  box-shadow: var(--lift-xs);
+}
+
+input[type="text"]::placeholder,
+input[type="search"]::placeholder {
+  color: var(--ink);
+  opacity: 0.78;
+  font-weight: 600;
+}
+
+input:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 0;
+}
+
+/* ------------------------------------------------------------------ tables */
+
+table.grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 600 12px/1.3 var(--mono);
+}
+
+table.grid-table th {
+  background: var(--ink);
+  color: var(--yellow);
+  text-align: left;
+  padding: 7px 9px;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  position: sticky;
+  top: 0;
+}
+
+table.grid-table td {
+  padding: 6px 9px;
+  border-top: 2px solid var(--ink);
+  background: var(--yellow);
+}
+
+table.grid-table tr:nth-child(even) td {
+  background: var(--blue);
+}
+
+.scroll-y {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* --------------------------------------------------------------- checklist */
+
+ul.ticks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font: 600 12.5px/1.4 var(--mono);
+}
+
+ul.ticks li {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 6px 10px;
+  border-top: 2px solid var(--ink);
+}
+
+ul.ticks li:first-child {
+  border-top: 0;
+}
+
+ul.ticks .box {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--ink);
+  background: var(--blue);
+  margin-top: 1px;
+}
+
+ul.ticks .box.on {
+  background: var(--red);
+}
+
+ul.ticks li.todo {
+  opacity: 0.62;
+}
+
+.sub-head {
+  margin: 0;
+  padding: 8px 10px 6px;
+  background: var(--red);
+  color: var(--yellow);
+  font: 800 11px/1.2 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-top: var(--edge);
+}
+
+.note {
+  margin: 0;
+  padding: 10px 12px;
+  font: 600 11.5px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--blue);
+}
+
+.note b {
+  background: var(--ink);
+  color: var(--yellow);
+  padding: 1px 5px;
+}
+
+.file-input {
+  display: none;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--yellow);
+  border: var(--edge);
+  box-shadow: var(--lift);
+  padding: 12px 18px;
+  font: 800 12px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  z-index: 40;
+  max-width: 90vw;
+}
+
+.toast.bad {
+  background: var(--red);
+  color: var(--yellow);
+}

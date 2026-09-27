@@ -1,0 +1,23 @@
+{
+  "name": "pdf-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A PDF application built from the file format up. Tier 1 is a from-scratch parser and writer.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}

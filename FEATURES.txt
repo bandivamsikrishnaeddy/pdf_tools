@@ -1,0 +1,263 @@
+================================================================================
+PDF TOOLS - FEATURE TRACKER
+================================================================================
+Scope: the paid PDF feature set of WPS PDF and Adobe Acrobat.
+Excluded: every feature that needs an AI API, a language model, or OCR.
+          The excluded list is at the bottom.
+
+Status:  [x] = done        [ ] = todo
+         A module is only [x] when every line under it is [x].
+Level:   E = easy         M = medium         H = hard
+         H means a custom engine. It does not mean a model.
+
+
+================================================================================
+DEPENDENCY FLOW - each tier needs the tiers above it
+================================================================================
+
+  TIER 1 - CORE ENGINE                    everything below needs this
+      - object parser
+      - object writer
+      - page tree ops
+      - content stream + fonts
+                        |
+                        v
+  TIER 2 - PAGE AND FILE LAYER            no text reflow needed
+      M1  merge
+      M2  split and extract
+      M3  page operations
+                        |
+                        v
+  TIER 3 - CONTENT LAYER                  needs a rasteriser + content stream
+      M4   convert
+      M5   compress
+      M6   edit content
+      M10  review and compare
+                        |
+                        v
+  TIER 4 - INTERACTIVE OBJECTS + CRYPTO   needs a crypto library
+      M7  forms
+      M8  sign
+      M9  secure
+
+
+================================================================================
+BUILD ORDER
+================================================================================
+  P1  core engine               parser, writer, page tree   -> M1  M2  M3
+  P2  raster + image pipeline   page to image, image to pdf -> M4  M5
+  P3  content stream + fonts    the hardest phase           -> M6  M10
+  P4  interactive obj writer    AcroForm + appearance       -> M7
+  P5  crypto                    security handler, signing   -> M9  M8
+  P6  stretch                   PDF to Office, layout only
+
+
+================================================================================
+TIER 1 - CORE ENGINE
+================================================================================
+
+--- object parser              E ------------------------------------ DONE ----- [x]
+    Read the cross-reference table, build a live object graph.
+    [x]  classic xref tables
+    [x]  xref streams
+    [x]  object streams
+    [x]  compressed file variants
+    [x]  incremental updates, keep the newest revision
+    [x]  broken-file repair mode
+    [ ]  encrypted file variants          detects /Encrypt, does not decrypt
+
+--- object writer              E ------------------------------------ DONE ----- [x]
+    Serialise a modified object graph back to a valid file.
+    [x]  incremental save, keep original bytes intact
+    [x]  full rewrite with a new xref
+    [ ]  object stream generation
+    [ ]  linearized output for fast web view
+
+--- page tree ops              E ------------------------------------ DONE ----- [x]
+    [x]  insert, delete, move, duplicate pages
+    [x]  page labels and numbering metadata, including /St
+    [x]  inherited /Resources and page box resolution
+    [x]  outline and bookmark tree, read
+    [ ]  outline and bookmark tree, write
+    [ ]  named destinations
+
+--- content stream + fonts     H ----------------------------- MOSTLY DONE ---- [ ]
+    The engine behind real text editing, redaction and stamping.
+    [x]  tokenise and rebuild content streams
+    [x]  text state, CTM, graphics state stack
+    [x]  widths, encodings, ToUnicode CMaps
+    [x]  text extraction with the position of every run
+    [ ]  font program parsing, TrueType and CFF
+    [ ]  embedded font subsetting and replacement
+    [ ]  form XObjects, shading
+    [x]  inline images kept as raw bytes rather than interpreted
+
+--- affine transforms          M ------------------------------------ DONE ----- [x]
+    [x]  concat in PDF order, inverse, determinant
+    [x]  user space to screen space, folding in /Rotate and scale
+
+
+================================================================================
+TIER 2 - PAGE AND FILE LAYER
+================================================================================
+
+--- M1 merge                   E ---------------------------------------------- [ ]
+    needs: parser, writer, page tree
+    [ ]  combine many files into one document
+    [ ]  choose a page range per source file
+    [ ]  reorder merged pages by drag
+    [ ]  insert blank pages of any size
+    [ ]  add a bookmark per source file
+    [ ]  batch merge a whole folder
+    [ ]  preflight check, report broken or protected inputs
+
+--- M2 split and extract       E ---------------------------------------------- [ ]
+    needs: parser, writer, page tree
+    [ ]  split by range, or every page as its own file
+    [ ]  extract a single page
+    [ ]  delete page ranges
+    [ ]  extract embedded images at native resolution
+    [ ]  extract file attachments
+    [ ]  batch split many files
+
+--- M3 page operations         E ---------------------------------------------- [ ]
+    needs: parser, writer, page tree
+    [ ]  rotate 0 / 90 / 180 / 270
+    [ ]  resize the page box, A4 / Letter / custom
+    [ ]  scale existing content to the new box
+    [ ]  crop margins by trimming the box
+    [ ]  change page size without scaling content
+    [ ]  N-up, 2 / 4 / 9 pages per sheet
+    [ ]  grid view, single page view, continuous view
+
+
+================================================================================
+TIER 3 - CONTENT LAYER
+================================================================================
+
+--- M4 convert                 M ---------------------------------------------- [ ]
+    needs: parser, writer, page tree, rasteriser
+    [ ]  PDF to JPG, PNG, TIFF with dpi and quality control
+    [ ]  images to PDF, with order, size and margin
+    [ ]  Office to PDF, DOCX / XLSX / PPTX
+    [ ]  PDF to plain text, with reading order
+    [ ]  PDF/A-1b and PDF/A-2b archival output
+    [ ]  PDF to Office, layout preserved      (H, no model is used, big effort)
+
+--- M5 compress                M ---------------------------------------------- [ ]
+    needs: parser, writer, image pipeline
+    [ ]  re-encode images at a chosen quality
+    [ ]  downsample images above a dpi cap
+    [ ]  convert colour to 1-bit where it is safe
+    [ ]  lossless shrink, object streams + duplicate removal
+    [ ]  target a maximum file size, iterate the settings
+    [ ]  print quality vs screen quality presets
+    [ ]  before and after size report, batch
+
+--- M6 edit content            H ---------------------------------------------- [ ]
+    needs: content stream, fonts, page tree, writer
+    [ ]  add text at any point
+    [ ]  add image at any point
+    [ ]  move, scale, rotate existing objects
+    [ ]  erase an object by removing its draw call
+    [ ]  watermark, header, footer, page numbers
+    [ ]  Bates numbering, seal stamp, cross-page stamp
+    [ ]  undo and redo over every edit
+    [ ]  show text boundary, a debug view of the text runs
+    [ ]  rewrite real text, change the words in the glyph run   (H, not an overlay)
+    [ ]  permanent redaction, remove the data not cover it     (H)
+
+--- M10 review and compare     M ---------------------------------------------- [ ]
+    needs: parser, content stream, text extraction
+    [ ]  compare two files and list what changed
+    [ ]  added, removed and modified text runs
+    [ ]  side-by-side view with synced scrolling
+    [ ]  full-text search with hit highlighting
+    [ ]  metadata viewer and editor, title / author / XMP
+    (  search inside images is excluded, that is OCR  )
+
+
+================================================================================
+TIER 4 - INTERACTIVE OBJECTS AND CRYPTO
+================================================================================
+
+--- M7 forms                  M ---------------------------------------------- [ ]
+    needs: writer, page tree, content stream for flatten
+    [ ]  create fields, text / checkbox / radio / dropdown / date / button
+    [ ]  field appearance streams
+    [ ]  tab order
+    [ ]  read-only and required flags
+    [ ]  validation, max length, pattern, numeric range
+    [ ]  calculate and order fields, sum and total
+    [ ]  fill and save values
+    [ ]  flatten fields into page content
+    [ ]  import and export field data as FDF
+
+--- M8 sign                   H ---------------------------------------------- [ ]
+    needs: image pipeline, writer, PKI and crypto library
+    [ ]  create a signature, draw / type / import an image
+    [ ]  save it and reuse it on other files
+    [ ]  place, size and flatten a signature onto the page
+    [ ]  sign form fields
+    [ ]  seal stamp with text and date, across pages
+    [ ]  signing levels, DocMDP allows changes or allows none
+    [ ]  verify a signature and show the audit trail
+    [ ]  certificate signature, PKCS#12, chain, revocation  (H)
+    [ ]  RFC 3161 timestamp                             (H)
+
+--- M9 secure                 M ---------------------------------------------- [ ]
+    needs: parser, writer, crypto library
+    [ ]  open password, AES-128 and AES-256
+    [ ]  permissions password, block print / copy / edit
+    [ ]  encrypt and decrypt
+    [ ]  remove metadata and XMP
+    (  permanent redaction lives in M6, not here  )
+
+
+================================================================================
+EXCLUDED - needs a model, an OCR engine, or an API
+================================================================================
+  These are paid WPS features. They are out of scope for this project.
+    -  OCR, scanned PDF to searchable with layout preserved
+    -  text edit on a scanned page, depends on OCR
+    -  chat with the PDF
+    -  summarise a document
+    -  translate, layout kept side by side
+    -  spell check and grammar
+    -  AI rewrite
+    -  AI form auto-fill, detect the fields and fill them
+    -  explain a selected sentence
+    -  smart compression, pick settings per image
+
+
+================================================================================
+NOTES
+================================================================================
+  -  WPS gives most of this list away free. What it sells is the ceiling of
+     each tool: batch, no limits, no watermark, high fidelity.
+  -  A text editor that only draws a box on top is not text editing. Rewrite
+     the glyph run or the edit is cosmetic.
+  -  A redaction that paints black is not a redaction. The bytes must go.
+  -  PDF/A is a paid add-on in Acrobat and a checkbox here, because it is
+     only a conformance pass over an output we already write.
+
+
+================================================================================
+WHERE TIER 1 ACTUALLY STANDS
+================================================================================
+  Done and tested:  lexer, object parser, object writer, xref tables, xref
+  streams, object streams, incremental updates, broken-offset repair, Flate,
+  LZW, ASCIIHex, ASCII85, RunLength, PNG and TIFF predictors, affine
+  transforms, the page tree with inheritance, and the content-stream state
+  machine with glyph positions.
+
+  135 tests pass. The fixtures are written by test/make_fixtures.py, a
+  separate Python implementation, so the suite cannot pass by agreeing with
+  the code it is testing.
+
+  Not started: object stream generation on write, xref stream on write,
+  font program parsing, outline writing, named destinations, encryption.
+
+  The text extraction already does most of what M10 needs, so search and
+  compare are close behind. The state machine is the base for real text
+  editing, so M6 is not as far off as the list makes it look.
