@@ -210,3 +210,84 @@ function saveAndReopen(writer: PdfWriter): { pages: PageTree } {
   const doc = PdfDocument.parse(writer.save({ incremental: false }));
   return { pages: new PageTree(doc, new PdfWriter(doc)) };
 }
+
+/**
+ * A page whose text is split across many text runs, which is what a real
+ * producer emits: one run per line, per style change, per font change.
+ *
+ * Every match after the first run sits at a page offset far larger than any
+ * glyph index inside its own run. Comparing the two directly finds no glyphs,
+ * and the match is dropped, so the app reports "no page contains" for a word
+ * that is plainly on the page.
+ */
+describe("search: a page made of many text runs", () => {
+  function manyRuns(writer: PdfWriter, pages: PageTree, lines: string[]) {
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    cs.push("BT");
+    cs.push("Tf", [new PdfName("F1"), 11]);
+    cs.push("TL", [15]);
+    cs.push("Tm", [1, 0, 0, 1, 60, 730]);
+    lines.forEach((line, i) => {
+      if (i > 0) cs.push("T*");
+      cs.push("Tj", [new PdfString(new TextEncoder().encode(line))]);
+    });
+    cs.push("ET");
+    pages.setContent(0, cs.serialize());
+    return saveAndReopen(writer).pages;
+  }
+
+  const lines = [
+    "Lorem ipsum dolor sit amet consectetur.",
+    "Ut enim ad minim veniam quis nostrud.",
+    "Morbi elit nunc facilisis a mollis a.",
+    "Exercitation ullamco laboris nisi ut.",
+    "Aliquip ex ea commodo consequat duis.",
+  ];
+
+  it("finds a word that sits in the first run", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const reopened = manyRuns(writer, pages, lines);
+    expect(search(reopened, "Lorem").matches.length).toBe(1);
+  });
+
+  it("finds a word in the third run, not the first", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const reopened = manyRuns(writer, pages, lines);
+    const out = search(reopened, "Morbi");
+    expect(out.matches.length).toBe(1);
+    expect(out.matches[0]?.rects.length).toBeGreaterThan(0);
+  });
+
+  it("finds a word in the last run", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const reopened = manyRuns(writer, pages, lines);
+    expect(search(reopened, "commodo").matches.length).toBe(1);
+  });
+
+  it("boxes the match where it is, not at the start of its run", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const reopened = manyRuns(writer, pages, lines);
+    const rect = search(reopened, "Morbi").matches[0]!.rects[0]!;
+    // "Morbi" is the first word of its line, so the box is at the line's left
+    // edge, on that line's baseline rather than the first line's.
+    expect(rect.x0).toBeCloseTo(60, 0);
+    expect(rect.y1).toBeLessThan(730);
+  });
+
+  it("finds every occurrence across all the runs", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const reopened = manyRuns(writer, pages, ["a", "a", "a", "a", "a"]);
+    // Five on the page that was rewritten. The second page still has its own
+    // text, which contains two more, so the total is seven.
+    const out = search(reopened, "a");
+    expect(out.matches.filter((m) => m.page === 0).length).toBe(5);
+    expect(out.matches.length).toBe(7);
+  });
+
+  it("still reports nothing for a word that is absent", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const reopened = manyRuns(writer, pages, lines);
+    expect(search(reopened, "zzzz").matches.length).toBe(0);
+  });
+});

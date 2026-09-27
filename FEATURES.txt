@@ -251,7 +251,8 @@ WHERE TIER 1 ACTUALLY STANDS
   transforms, the page tree with inheritance, and the content-stream state
   machine with glyph positions.
 
-  172 tests pass. The fixtures are written by test/make_fixtures.py, a
+  189 tests pass, 11 of them against public/sample.pdf, which is a real
+  file from a real producer rather than a generated one. The fixtures are written by test/make_fixtures.py, a
   separate Python implementation, and every one is also opened by macOS
   CoreGraphics, so the suite cannot pass by agreeing with the code it tests
   and cannot pass on files that are not real PDFs.

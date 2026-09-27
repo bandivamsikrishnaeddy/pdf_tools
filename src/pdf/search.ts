@@ -168,7 +168,12 @@ export function search(pages: PageTree, query: string, opts: SearchOptions = {})
       const rects: HighlightRect[] = [];
       for (const s of spans) {
         if (s.to <= start || s.from >= end) continue;
-        rects.push(...rectsForRange(s.run, start, end, Math.max(1, s.run.height), !userSpace));
+        // A run's glyph indices count from the start of THAT run, so the page
+        // offset has to be brought back to run-local before it is compared.
+        // Skipping this makes every match after the first run find no glyphs.
+        rects.push(
+          ...rectsForRange(s.run, start - s.from, end - s.from, Math.max(1, s.run.height), !userSpace),
+        );
       }
       if (rects.length === 0) continue;
 

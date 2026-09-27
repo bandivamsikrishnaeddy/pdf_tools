@@ -281,12 +281,73 @@ labels = build([
 ], trailer_size=16)
 (OUT / "labels.pdf").write_bytes(labels)
 
-# The demo file the app loads on arrival. It lives in public/ so Vite serves it
-# at a fixed URL in both dev and the built site.
-demo = OUT.parent.parent / "public"
-demo.mkdir(parents=True, exist_ok=True)
-(demo / "sample.pdf").write_bytes((OUT / "simple.pdf").read_bytes())
+# ------------------------------------------------------------- showcase.pdf
+# The document the app loads on arrival. It is deliberately REALISTIC: several
+# text runs per page, a leading set with TL and advanced with T*, and a word
+# repeated in LATE runs. A one-run-per-page sample hides whole classes of bug,
+# because a match at offset 0 of its run coincides with its page offset.
+def body(lines, first_font, first_size, x, y, leading, font):
+    out = (b"BT /" + font + b" " + str(first_size).encode() + b" Tf "
+           + b"/TL " + str(leading).encode() + b" "
+           + b"1 0 0 1 " + str(x).encode() + b" " + str(y).encode() + b" Tm ")
+    for i, line in enumerate(lines):
+        if i > 0:
+            out += b"T* "
+        out += b"(" + line.encode("latin-1") + b") Tj "
+    return out + b"ET\n"
+
+SHOW_LINES = [
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+    "Integer vitae justo eget magna porttitor commodo. Nam at",
+    "nibh sed justo posuere, in tincidunt neque vitae elit. Donec",
+    "venenatis, nisl eu tincidunt sagittis, vitae luctus arcu.",
+    "Revenue rose across every region this quarter, led by the",
+    "northern territory. Revenue in the southern region grew",
+    "more slowly, held back by a delayed contract renewal that",
+    "should close before the end of the fiscal year.",
+]
+SHOW_LINES_2 = [
+    "Sed posuere consectetur est at lobortis. Aenean euismod",
+    "pellentesque nisl ut sapien commodo, a tincidunt mauris",
+    "fringilla. Vestibulum id ligula porta felis euismod semper.",
+    "Revenue recognition changed in March, which moves some",
+    "income into the following period. The effect on revenue",
+    "was a timing difference only, with no change to the total.",
+]
+
+def build_showcase():
+    objects = []
+    page_refs = []
+    num = 1
+    objects.append((num, b"<< /Type /Catalog /Pages 2 0 R >>")); num += 1
+    kids = b" ".join(b"%d 0 R" % (3 + 2 * i) for i in range(3))
+    objects.append((2, b"<< /Type /Pages /Kids [" + kids + b"] /Count 3 >>"))
+    for i in range(3):
+        pnum = 3 + 2 * i
+        # Page 3 owns content 4, page 5 owns 6, page 7 owns 8. Letting this
+        # run on its own handed page 5 and its content stream the same number.
+        content_num = pnum + 1
+        title = ["Quarterly Report", "Regional Detail", "Notes"][i]
+        lines = SHOW_LINES if i == 0 else (SHOW_LINES_2 if i == 1 else SHOW_LINES)
+        stream = (b"q 1 0 0 rg BT /F1 20 Tf 1 0 0 1 60 730 Tm (" + title.encode() + b") Tj ET Q\n"
+                  + body(lines, b"F2", 11, 60, 690, 15, b"F2"))
+        objects.append((pnum, b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                            b"/Resources << /Font << /F1 9 0 R /F2 10 0 R >> >> "
+                            b"/Contents " + str(content_num).encode() + b" 0 R >>"))
+        objects.append((content_num, stream_obj(b"", stream)))
+        content_num += 1
+    objects.append((9, FONT))                       # F1
+    objects.append((10, FONT.replace(b"/FirstChar", b"/IndirectResources /FirstChar")))  # F2
+    return build(objects, trailer_size=11)
+
+(OUT / "showcase.pdf").write_bytes(build_showcase())
+
+# public/sample.pdf is NOT generated here. It is a real PDF 1.3 file from a
+# real producer, and it is the specimen that caught two engine bugs: inherited
+# keys arriving as indirect references, and a 1pt font scaled by Tm. Tests in
+# test/real-world.test.ts read it, so a regression fails the suite.
+# See README.md for how to replace it.
 
 for f in sorted(OUT.glob("*.pdf")):
     print(f"{f.name:20s} {f.stat().st_size:6d} bytes")
-print(f"{'public/sample.pdf':20s} {(demo / 'sample.pdf').stat().st_size:6d} bytes")
+

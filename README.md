@@ -36,7 +36,7 @@ Node 20 or newer. No other tooling, no native modules, no API keys.
 | Pages | add, delete, duplicate, reorder, rotate, resize, scale content with the page |
 | Structure | bookmarks, printed page labels, inherited page attributes |
 | Text | extracts every run with its real position, widths from the file's own font metrics |
-| Search | every occurrence, highlighted in place, with a counter and next/previous |
+| Search | every occurrence, highlighted in place, with a counter, next/previous, whole-word and match-case |
 | Saves | a full rewrite, or an append that leaves every original byte untouched |
 
 ### Not yet
@@ -94,7 +94,7 @@ page full of text reports zero text with no error anywhere.
 
 ## Testing
 
-172 tests, all of them reading real PDF bytes.
+189 tests, all of them reading real PDF bytes.
 
 **The fixtures are not produced by the code under test.** `test/make_fixtures.py`
 is a separate implementation in Python. A suite built from the engine's own
@@ -107,11 +107,25 @@ produces and CoreGraphics rejects is a broken fixture, not a broken engine.
 **Every fix is checked against a mutation.** Reverting the inherited-key fix
 fails 5 of the tests added for it. A check that cannot fail is not a check.
 
-The fixtures between them cover: a classic index, Flate-compressed streams, an
-object stream with an xref stream, an incremental update, every cross-reference
-offset shifted by 5000 bytes, a nested page tree with an intermediate node,
-every inheritable key behind an indirect reference, page labels in three
+The generated fixtures between them cover: a classic index, Flate-compressed
+streams, an object stream with an xref stream, an incremental update, every
+cross-reference offset shifted by 5000 bytes, a nested page tree with an
+intermediate node, every inheritable key behind an indirect reference, a page
+built from many text runs advanced with `TL` and `T*`, page labels in three
 formats, and a two-level bookmark tree.
+
+**`public/sample.pdf` is not generated.** It is a real PDF 1.3 file from a real
+producer, and it is both the demo the app opens and the specimen the suite reads
+in `test/real-world.test.ts`. It does three things no generated fixture did:
+
+- every inherited key arrives as an indirect reference
+- every font is declared at 1pt and scaled with `Tm`
+- 781 text runs sit on one page
+
+A suite built only from easy fixtures agreed with itself for a long time. Two
+of the bugs in the table above were invisible to every one of them, because a
+hand-built page has a single text run per page and a match at offset 0 of its
+run happens to share its page offset.
 
 ---
 
@@ -130,6 +144,8 @@ shown up as a crash.
 | Glyph size ignored the text matrix | a 1pt font scaled by `Tm` drew one pixel tall; positions were already correct |
 | Highlight rectangles inverted in screen space | the box sat below the baseline instead of over the text |
 | Inherited keys returned unresolved | 26 parts parsed, 0 repairs, 0 characters |
+| Match offsets compared page-wide against run-local glyph indices | every match after the first run found no glyphs, so search reported "no page contains" for words plainly on the page |
+| `Tj` advanced the line matrix as well as the text matrix | every following `T*` started where the last line ended, so text walked diagonally off the page |
 
 ---
 

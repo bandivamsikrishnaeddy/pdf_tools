@@ -9,6 +9,15 @@ export function fixture(name: string): Uint8Array {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
 }
 
+/**
+ * The document the app ships as its demo. It is a real PDF 1.3 file from a real
+ * producer, and it is the specimen that found two engine bugs, so the suite
+ * reads the very file that is deployed.
+ */
+export function demo(): Uint8Array {
+  return readFileSync(new URL("../public/sample.pdf", import.meta.url));
+}
+
 export function load(name: string): PdfDocument {
   return PdfDocument.parse(fixture(name));
 }

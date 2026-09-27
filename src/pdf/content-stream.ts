@@ -238,10 +238,23 @@ export class GraphicsState {
     this.lineMatrix = Matrix.identity;
   }
 
-  /** `Td` moves the line origin, and the text position follows it. */
+  /**
+   * `Td`, `TD` and `T*` move the line origin, and the text position follows it.
+   * Both matrices move together.
+   */
   moveLine(tx: number, ty: number): void {
     this.lineMatrix = Matrix.concat(Matrix.translation(tx, ty), this.lineMatrix);
     this.textMatrix = this.lineMatrix;
+  }
+
+  /**
+   * A text-showing operator moves the text matrix ONLY. The line matrix is the
+   * position the next `T*` returns to, so advancing it as well makes every
+   * following line start at the end of the previous one, and text walks
+   * diagonally down the page instead of straight down.
+   */
+  advanceText(tx: number): void {
+    this.textMatrix = Matrix.concat(Matrix.translation(tx, 0), this.textMatrix);
   }
 
   clone(): GraphicsState {
@@ -402,7 +415,7 @@ export function extractText(cs: ContentStream, resources: Resources, baseCtm: Ma
             } else if (typeof item === "number") {
               // A number is a gap in thousandths of the font size, moved left.
               const shift = (-item / 1000) * gs.fontSize * gs.horizontalScale;
-              gs.moveLine(shift, 0);
+              gs.advanceText(shift);
             }
           }
         }
@@ -504,7 +517,7 @@ function showText(bytes: Uint8Array, gs: GraphicsState, runs: TextRun[]): string
     });
   }
 
-  gs.moveLine(advance, 0);
+  gs.advanceText(advance);
   return text;
 }
 
