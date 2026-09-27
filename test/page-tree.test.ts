@@ -331,3 +331,155 @@ describe("page tree: a chain of edits still reads back", () => {
     }
   });
 });
+
+/**
+ * A producer may declare a font at 1pt and scale it with `cm` instead. The
+ * size on the page then lives in the transformation matrix, not in `Tf`, and a
+ * reader that trusts `fontSize` draws the text one pixel tall. This is the
+ * shape a real PDF 1.3 file from a common producer used.
+ */
+describe("text size when the font is scaled by cm", () => {
+  function scaled(writer: PdfWriter, pages: PageTree, factor: number) {
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    cs.push("q");
+    cs.push("cm", [factor, 0, 0, factor, 0, 0]);
+    cs.push("BT");
+    cs.push("Tf", [new PdfName("F1"), 1]);
+    cs.push("Tm", [1, 0, 0, 1, 0, 0]);
+    cs.push("Tj", [new PdfString(Uint8Array.of(0x48))]);
+    cs.push("ET");
+    cs.push("Q");
+    pages.setContent(0, cs.serialize());
+    return saveAndReopen(writer).pages.textOf(0).runs[0]!;
+  }
+
+  it("reports the scaled size, not the declared one", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const run = scaled(writer, pages, 36);
+    expect(run.fontSize).toBe(1);
+    expect(run.height).toBeCloseTo(36, 4);
+  });
+
+  it("keeps the advance scaled too", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const run = scaled(writer, pages, 10);
+    // 'H' is 722/1000 em, so 7.22pt once the matrix scale of 10 is applied.
+    expect(run.width).toBeCloseTo(7.22, 3);
+  });
+
+  it("doubles the size again when the page is shown at double scale", () => {
+    const { pages } = tree("simple.pdf");
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    cs.push("q");
+    cs.push("cm", [20, 0, 0, 20, 0, 0]);
+    cs.push("BT");
+    cs.push("Tf", [new PdfName("F1"), 1]);
+    cs.push("Tj", [new PdfString(Uint8Array.of(0x48))]);
+    cs.push("ET");
+    cs.push("Q");
+    pages.setContent(0, cs.serialize());
+    expect(pages.textOf(0, 1).runs[0]?.height).toBeCloseTo(20, 4);
+    expect(pages.textOf(0, 2).runs[0]?.height).toBeCloseTo(40, 4);
+  });
+});
+
+describe("text run direction", () => {
+  it("is upright for ordinary text", () => {
+    const { pages } = tree("simple.pdf");
+    expect(pages.textOf(0).runs[0]?.angle).toBeCloseTo(0, 6);
+  });
+
+  it("turns with the page, so a rotated page can be drawn", () => {
+    const { pages } = tree("simple.pdf");
+    pages.setRotation(0, 90);
+    const run = pages.textOf(0).runs[0]!;
+    // A quarter turn clockwise, in a coordinate system where y grows down.
+    expect(Math.abs(run.angle)).toBeCloseTo(Math.PI / 2, 4);
+  });
+
+  it("is zero rather than undefined for a run with no advance", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    cs.push("BT");
+    cs.push("Tf", [new PdfName("F1"), 12]);
+    cs.push("Tj", [new PdfString(Uint8Array.of(0x41))]);
+    cs.push("ET");
+    pages.setContent(0, cs.serialize());
+    const run = saveAndReopen(writer).pages.textOf(0).runs[0]!;
+    expect(Number.isFinite(run.angle)).toBe(true);
+    expect(run.angle).toBe(0);
+  });
+});
+
+/**
+ * The other common way a producer fakes a font size: a 1pt font plus a scaled
+ * `Tm`. The scale lives in the text matrix, not the CTM, so a reader that only
+ * looks at the CTM computes a 1pt glyph for a 24pt heading and draws the whole
+ * page one pixel tall.
+ */
+describe("text size when the font is scaled by Tm", () => {
+  /** Build a one-glyph page from explicit operations, then reopen it. */
+  function firstRun(
+    writer: PdfWriter,
+    pages: PageTree,
+    build: (cs: ReturnType<PageTree["contentOf"]>) => void,
+  ) {
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    build(cs);
+    pages.setContent(0, cs.serialize());
+    return saveAndReopen(writer).pages.textOf(0).runs[0]!;
+  }
+
+  it("takes the size from the text matrix", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const r = firstRun(writer, pages, (cs) => {
+      cs.push("BT");
+      cs.push("Tf", [new PdfName("F1"), 1]);
+      cs.push("Tm", [24, 0, 0, 24, 72, 700]);
+      cs.push("Tj", [new PdfString(Uint8Array.of(0x48))]);
+      cs.push("ET");
+    });
+    expect(r.fontSize).toBe(1);
+    expect(r.height).toBeCloseTo(24, 4);
+  });
+
+  it("multiplies the CTM scale and the text matrix scale together", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    cs.push("q");
+    cs.push("cm", [10, 0, 0, 10, 0, 0]);
+    cs.push("BT");
+    cs.push("Tf", [new PdfName("F1"), 1]);
+    cs.push("Tm", [2, 0, 0, 2, 0, 0]);
+    cs.push("Tj", [new PdfString(Uint8Array.of(0x48))]);
+    cs.push("ET");
+    cs.push("Q");
+    pages.setContent(0, cs.serialize());
+    // 1pt font, doubled by Tm, multiplied again by the 10x cm.
+    expect(saveAndReopen(writer).pages.textOf(0).runs[0]?.height).toBeCloseTo(20, 4);
+  });
+
+  it("applies the horizontal scale as well", () => {
+    const { writer, pages } = tree("simple.pdf");
+    const cs = pages.contentOf(0);
+    cs.ops.length = 0;
+    cs.push("BT");
+    cs.push("Tf", [new PdfName("F1"), 1]);
+    cs.push("Tz", [200]);
+    cs.push("Tm", [10, 0, 0, 10, 0, 0]);
+    cs.push("Tj", [new PdfString(Uint8Array.of(0x48))]);
+    cs.push("ET");
+    pages.setContent(0, cs.serialize());
+    expect(saveAndReopen(writer).pages.textOf(0).runs[0]?.height).toBeCloseTo(20, 4);
+  });
+
+  it("leaves an unscaled run at its declared size", () => {
+    const { pages } = tree("simple.pdf");
+    expect(pages.textOf(0).runs[0]?.height).toBeCloseTo(24, 4);
+  });
+});

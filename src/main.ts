@@ -23,6 +23,67 @@ interface Loaded {
 
 let current: Loaded | null = null;
 
+/**
+ * The engine's own words are not a user's words. These tables turn the
+ * internal names into something a person opening a file would recognise.
+ */
+const KIND_WORDS: Record<string, string> = {
+  dict: "settings",
+  stream: "content",
+  array: "a list of values",
+  scalar: "a single value",
+  null: "empty",
+};
+
+const SUBTYPE_WORDS: Record<string, string> = {
+  Catalog: "the whole document",
+  Pages: "a group of pages",
+  Page: "one page",
+  Font: "a font",
+  FontDescriptor: "font details",
+  ObjStm: "other parts, packed together",
+  XRef: "the file index",
+  XObject: "an image or shape",
+  Annot: "a comment or stamp",
+  Annots: "comments and stamps",
+  Metadata: "file information",
+  MetadataStream: "file information",
+  StructTreeRoot: "reading order",
+  Outlines: "the bookmarks",
+  AcroForm: "a fillable form",
+};
+
+const FILTER_WORDS: Record<string, string> = {
+  FlateDecode: "standard (zlib)",
+  Fl: "standard (zlib)",
+  LZWDecode: "LZW",
+  LZW: "LZW",
+  ASCIIHexDecode: "hex",
+  AHx: "hex",
+  ASCII85Decode: "ASCII85",
+  A85: "ASCII85",
+  RunLengthDecode: "run length",
+  RL: "run length",
+  DCTDecode: "JPEG image",
+  DCT: "JPEG image",
+  JPXDecode: "JPEG 2000 image",
+  CCITTFaxDecode: "fax image",
+  JBIG2Decode: "JBIG2 image",
+};
+
+function whatItIs(row: { type: string; subtype: string | null }): string {
+  if (row.subtype) return SUBTYPE_WORDS[row.subtype] ?? row.subtype;
+  return KIND_WORDS[row.type] ?? row.type;
+}
+
+function howItIsStored(kind: 0 | 1 | 2): string {
+  if (kind === 1) return "in the file";
+  if (kind === 2) return "packed away";
+  return "not used";
+}
+
+
+
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
   if (!el) throw new Error(`missing element #${id}`);
@@ -40,6 +101,8 @@ const qEl = $<HTMLInputElement>("q");
 const pageNote = $<HTMLElement>("page-note");
 const pageCount = $<HTMLElement>("page-count");
 const verdict = $<HTMLElement>("verdict");
+const viewerTitle = $<HTMLElement>("viewer-title");
+const advice = $<HTMLElement>("advice");
 
 // ------------------------------------------------------------------ toast
 
@@ -61,21 +124,21 @@ async function open(file: File): Promise<void> {
   try {
     const buf = new Uint8Array(await file.arrayBuffer());
     if (buf.length < 8) {
-      toast("That file is too small to be a PDF", true);
+      toast("That file is too small to be a PDF.", true);
       return;
     }
     const doc = PdfDocument.parse(buf);
     if (doc.encrypted) {
-      toast("Encrypted files land in Tier 5, not yet", true);
+      toast("This file is password protected. It will open read-only.", true);
     }
     const writer = new PdfWriter(doc);
     const pages = new PageTree(doc, writer);
     current = { name: file.name, bytes: buf, doc, writer, pages, selected: 0 };
     render();
     if (doc.encrypted) {
-      toast("Parsed the index, but strings and streams stay encrypted", true);
+      toast("Opened the structure, but the text stays locked.", true);
     } else {
-      toast(`Opened ${file.name} · ${pages.count} page${pages.count === 1 ? "" : "s"}`);
+      toast(`${file.name} · ${pages.count} page${pages.count === 1 ? "" : "s"}`);
     }
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
@@ -147,23 +210,47 @@ function render(): void {
   }
 
   setFacts([
-    ["PDF version", doc.version],
+    ["Format version", doc.version],
     ["Pages", String(pages.count)],
-    ["Indexed objects", String(doc.xref.size)],
-    ["Cross-ref sections", String(doc.sectionsRead.length)],
-    ["Text runs", String(runs)],
+    ["Parts in the file", String(doc.xref.size)],
+    // One index section is the ordinary case and says nothing on its own, so
+    // this row counts the saves layered on top of the original instead.
+    ["Later saves on top", String(Math.max(0, doc.sectionsRead.length - 1))],
+    ["Text blocks", String(runs)],
     ["Characters", String(chars)],
-    ["Filters used", filters.size ? [...filters].join(", ") : "none"],
-    ["Repairs needed", String(doc.repairs.length), doc.repairs.length > 0],
-    ["Encrypted", doc.encrypted ? "yes" : "no", doc.encrypted],
+    ["Compression", filters.size ? [...filters].join(", ") : "none"],
+    [
+      "Automatic fixes",
+      doc.repairs.length === 0 ? "none needed" : String(doc.repairs.length),
+      doc.repairs.length > 0,
+    ],
+    ["Password protected", doc.encrypted ? "yes" : "no", doc.encrypted],
   ]);
 
-  verdict.textContent = doc.repairs.length
-    ? `${doc.repairs.length} repair${doc.repairs.length === 1 ? "" : "s"} applied`
-    : "Clean parse";
-  verdict.className = doc.repairs.length ? "badge badge-red" : "badge badge-blue";
+  // A zero here is the one number a user cannot interpret on its own, so the
+  // panel says what it means rather than leaving a bare 0 on screen.
+  if (chars === 0 && pages.count > 0) {
+    advice.hidden = false;
+    advice.textContent = doc.encrypted
+      ? "No text could be read, because this file is password protected."
+      : "No text found. That usually means the pages are scans or photos. Reading those needs text recognition, which this app does not have yet.";
+  } else {
+    advice.hidden = true;
+  }
+
+  if (doc.encrypted) {
+    verdict.textContent = "Password protected";
+    verdict.className = "badge badge-red";
+  } else if (doc.repairs.length) {
+    verdict.textContent = `Repaired (${doc.repairs.length})`;
+    verdict.className = "badge badge-red";
+  } else {
+    verdict.textContent = "Opened cleanly";
+    verdict.className = "badge badge-blue";
+  }
 
   pageCount.textContent = `${pages.count} page${pages.count === 1 ? "" : "s"}`;
+  viewerTitle.textContent = current.name;
   renderPages(perPage);
   renderInventory();
   renderOutline();
@@ -174,11 +261,12 @@ function render(): void {
 function filtersOf(dict: { get(k: string): unknown }): string[] {
   const raw = dict.get("Filter");
   const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
-  return list.map((v) => {
+  const names = list.map((v) => {
     const r = current?.doc.resolve(v as never);
     if (r && typeof r === "object" && "name" in r) return String((r as { name: string }).name);
-    return "?";
+    return "unknown";
   });
+  return [...new Set(names.map((n) => FILTER_WORDS[n] ?? n))];
 }
 
 /**
@@ -208,7 +296,7 @@ function renderPages(perPage: string[]): void {
   if (pages.count === 0) {
     const note = document.createElement("div");
     note.className = "empty-note";
-    note.textContent = "This document has no pages in its page tree.";
+    note.textContent = "This file reports no pages.";
     pagesEl.appendChild(note);
     return;
   }
@@ -260,9 +348,9 @@ function renderPages(perPage: string[]): void {
 }
 
 /**
- * Draw the text layer at the positions the engine reported. This is not a
- * renderer: glyphs and images are not drawn, only the text runs the state
- * machine found, at the size and place the file specifies.
+ * Draw the page's text at the positions the engine reported, in a monospace
+ * face that stands in for the document's own fonts. Images and vector shapes
+ * are not drawn, which the panel beside it says out loud.
  */
 function drawTextLayer(canvas: HTMLCanvasElement, pageIndex: number, scale: number): void {
   if (!current) return;
@@ -275,15 +363,22 @@ function drawTextLayer(canvas: HTMLCanvasElement, pageIndex: number, scale: numb
   ctx.fillStyle = "#111111";
   ctx.textBaseline = "alphabetic";
   for (const run of result.runs) {
-    const size = run.fontSize * scale;
-    if (size <= 0.4) continue;
-    // A monospace face keeps runs legible at small sizes. The box drawn is the
-    // one the engine computed, so the outline shows the real run extent.
+    // The size comes from the transformation matrix, not from `Tf`. A file
+    // that declares a 1pt font and scales it up with `cm` would otherwise
+    // draw its whole page one pixel tall.
+    const size = run.height;
+    if (size <= 0.5) continue;
+    ctx.save();
+    ctx.translate(run.x, run.y);
+    ctx.rotate(run.angle);
+    // A monospace face stands in for the document's own fonts. The box comes
+    // from the file's real glyph widths, so the fallback face is stretched to
+    // fit it and the text lands where the document says it does.
     ctx.font = `${size}px ui-monospace, Menlo, monospace`;
-    ctx.fillText(run.text, run.x, run.y);
-    ctx.strokeStyle = "rgba(63, 138, 177, 0.6)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(run.x, run.y - run.height * 0.82, Math.max(1, run.width), Math.max(1, run.height));
+    const natural = ctx.measureText(run.text).width;
+    if (natural > 0 && run.width > 0) ctx.scale(run.width / natural, 1);
+    ctx.fillText(run.text, 0, 0);
+    ctx.restore();
   }
 }
 
@@ -291,13 +386,13 @@ function renderInventory(): void {
   if (!current) return;
   const rows = current.doc.inventory();
   if (rows.length === 0) {
-    inventoryEl.innerHTML = '<p class="note">No objects were indexed.</p>';
+    inventoryEl.innerHTML = '<p class="note">Nothing could be read from this file.</p>';
     return;
   }
   const table = document.createElement("table");
   table.className = "grid-table";
   const head = document.createElement("tr");
-  for (const h of ["#", "kind", "subtype", "xref"]) {
+  for (const h of ["#", "What it is", "Stored as"]) {
     const th = document.createElement("th");
     th.textContent = h;
     head.appendChild(th);
@@ -305,12 +400,7 @@ function renderInventory(): void {
   table.appendChild(head);
   for (const r of rows) {
     const tr = document.createElement("tr");
-    const cells = [
-      String(r.num),
-      r.type,
-      r.subtype ?? "—",
-      r.kind === 1 ? "offset" : r.kind === 2 ? "objstm" : "free",
-    ];
+    const cells = [String(r.num), whatItIs(r), howItIsStored(r.kind)];
     for (const c of cells) {
       const td = document.createElement("td");
       td.textContent = c;
@@ -353,7 +443,7 @@ function renderOutline(): void {
 function inventorySafe(host: HTMLElement, items: string[], labels: string[]): void {
   host.replaceChildren();
   if (items.length === 0 && labels.length === 0) {
-    host.innerHTML = '<p class="note">This document has no bookmarks.</p>';
+    host.innerHTML = '<p class="note">This file has no bookmarks.</p>';
     return;
   }
   if (items.length > 0) {
@@ -524,9 +614,9 @@ buttons.saveFull.addEventListener("click", () => {
   try {
     const bytes = current.writer.save({ incremental: false });
     download(bytes, `${baseName(current.name)}-rewritten.pdf`);
-    toast(`Rewrote the file · ${current.bytes.length} → ${bytes.length} bytes`);
+    toast(`Saved · ${current.bytes.length.toLocaleString()} → ${bytes.length.toLocaleString()} bytes`);
   } catch (err) {
-    toast(`Rewrite failed: ${err instanceof Error ? err.message : String(err)}`, true);
+    toast(`Could not save: ${err instanceof Error ? err.message : String(err)}`, true);
   }
 });
 
@@ -544,12 +634,12 @@ buttons.saveInc.addEventListener("click", () => {
     download(bytes, `${baseName(current.name)}-appended.pdf`);
     toast(
       same
-        ? `Appended · original ${current.bytes.length} bytes untouched, +${bytes.length - current.bytes.length}`
-        : "Appended, but the original bytes changed — that is a bug",
+        ? `Saved · the original ${current.bytes.length.toLocaleString()} bytes are untouched`
+        : "Saved, but the original file changed. That is a bug.",
       !same,
     );
   } catch (err) {
-    toast(`Append failed: ${err instanceof Error ? err.message : String(err)}`, true);
+    toast(`Could not save: ${err instanceof Error ? err.message : String(err)}`, true);
   }
 });
 

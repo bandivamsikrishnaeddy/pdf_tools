@@ -247,6 +247,21 @@ nested = build([
 ], trailer_size=10)
 (OUT / "nested.pdf").write_bytes(nested)
 
+# ---------------------------------------------------------- indirect.pdf
+# Every inheritable key is an INDIRECT reference. Real producers do this
+# constantly, and a page tree that reads the raw value instead of resolving it
+# finds no font dictionary and reports zero text on a page full of text.
+indirect = build([
+    (1, b"<< /Type /Catalog /Pages 2 0 R >>"),
+    (2, b"<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox 6 0 R /Resources 7 0 R >>"),
+    (3, b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>"),
+    (4, stream_obj(b"", b"BT /F1 24 Tf 72 700 Td (Indirect Resource Page) Tj ET")),
+    (5, FONT.replace(b"/FirstChar", b"/IndirectResources /FirstChar")),
+    (6, b"[0 0 612 792]"),
+    (7, b"<< /Font << /F1 5 0 R >> >>"),
+], trailer_size=8)
+(OUT / "indirect.pdf").write_bytes(indirect)
+
 # ------------------------------------------------------------- labels.pdf
 labels = build([
     (1, b"<< /Type /Catalog /Pages 2 0 R /PageLabels << /Nums [0 << /S /r >> 1 << /S /D /St 5 >>] >> "

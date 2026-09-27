@@ -191,9 +191,12 @@ export class PageTree {
     collect(this.rootRef ?? this.root, 0);
 
     for (let i = chain.length - 1; i >= 0; i--) {
-      // Nearest ancestor first: the page overrides anything it inherits.
+      // Nearest ancestor first: the page overrides anything it inherits. The
+      // value is resolved, because an inherited key is very often an indirect
+      // reference, and a caller asking for the effective box or resource
+      // dictionary wants the object, not the pointer to it.
       const v = (chain[i] as PdfDict).get(key);
-      if (v !== undefined && v !== null) return v;
+      if (v !== undefined && v !== null) return this.resolve(v);
     }
     return null;
   }

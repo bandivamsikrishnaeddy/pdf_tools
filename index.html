@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PDF Tools — a PDF app built from the file format up</title>
+    <title>PDF Tools — edit, reorder and search your PDFs</title>
     <meta
       name="description"
-      content="A PDF application with its own parser and writer. No PDF library. Tier 1: core engine."
+      content="Open a PDF, reorder and rotate pages, search the text, and save a copy. Everything happens in your browser — your file is never uploaded."
     />
   </head>
   <body>
@@ -14,12 +14,12 @@
       <header class="masthead">
         <div class="title-block">
           <h1>PDF<em>Tools</em></h1>
-          <p>Parser &amp; writer written from the spec · no PDF library</p>
+          <p>Your file never leaves this device</p>
         </div>
         <div class="badge-row">
-          <div class="badge badge-blue">Tier 1 · Core engine</div>
-          <div class="badge badge-red">Neobrutalism</div>
-          <div class="badge badge-yellow" id="verdict">Waiting for a file</div>
+          <div class="badge badge-blue">Built-in PDF engine</div>
+          <div class="badge badge-red">No sign-up</div>
+          <div class="badge badge-yellow" id="verdict">No file open</div>
         </div>
       </header>
 
@@ -31,73 +31,71 @@
             <div class="panel-body">
               <div class="drop" id="drop" tabindex="0" role="button">
                 <strong>Drop a PDF</strong>
-                <span>or click to choose · parsed in the browser</span>
+                <span>or click to choose · nothing is uploaded</span>
               </div>
-              <input
-                class="file-input"
-                id="file"
-                type="file"
-                accept="application/pdf,.pdf"
-              />
+              <input class="file-input" id="file" type="file" accept="application/pdf,.pdf" />
             </div>
           </section>
 
           <section class="panel">
-            <h2>What the engine found</h2>
+            <h2>Document</h2>
             <div class="panel-body tight">
+              <p class="note">What this app found when it read the file.</p>
               <dl class="facts" id="facts">
-                <dt>PDF version</dt>
+                <dt>Format version</dt>
                 <dd>—</dd>
                 <dt>Pages</dt>
                 <dd>—</dd>
-                <dt>Indexed objects</dt>
+                <dt>Parts in the file</dt>
                 <dd>—</dd>
-                <dt>Cross-ref sections</dt>
+                <dt>Later saves on top</dt>
                 <dd>—</dd>
-                <dt>Text runs</dt>
+                <dt>Text blocks</dt>
                 <dd>—</dd>
                 <dt>Characters</dt>
                 <dd>—</dd>
-                <dt>Filters used</dt>
+                <dt>Compression</dt>
                 <dd>—</dd>
-                <dt>Repairs needed</dt>
+                <dt>Automatic fixes</dt>
                 <dd>—</dd>
-                <dt>Encrypted</dt>
+                <dt>Password protected</dt>
                 <dd>—</dd>
               </dl>
+              <p class="note advice" id="advice" hidden></p>
             </div>
           </section>
 
           <section class="panel red">
-            <h2>Page operations</h2>
+            <h2>Page tools</h2>
             <div class="panel-body">
-              <p class="note" id="page-note" style="background: var(--yellow)">
-                No page selected.
-              </p>
+              <p class="note" id="page-note" style="background: var(--yellow)">No page selected.</p>
               <div class="btn-row" style="margin-top: 12px">
-                <button id="rot-left" disabled>Rotate &larr;</button>
-                <button id="rot-right" disabled>Rotate &rarr;</button>
+                <button id="rot-left" disabled>Rotate left</button>
+                <button id="rot-right" disabled>Rotate right</button>
+              </div>
+              <div class="btn-row" style="margin-top: 10px">
                 <button id="move-up" disabled>Move up</button>
                 <button id="move-down" disabled>Move down</button>
               </div>
               <div class="btn-row" style="margin-top: 10px">
-                <button id="insert" disabled>Insert blank</button>
+                <button id="insert" disabled>Add blank page</button>
                 <button id="dup" disabled>Duplicate</button>
-                <button class="go" id="del" disabled>Delete page</button>
+                <button class="go" id="del" disabled>Delete</button>
               </div>
             </div>
           </section>
 
           <section class="panel">
-            <h2>Save</h2>
+            <h2>Save a copy</h2>
             <div class="panel-body">
               <div class="btn-row">
-                <button class="dark" id="save-full" disabled>Rewrite file</button>
-                <button class="go" id="save-inc" disabled>Append changes</button>
+                <button class="dark" id="save-full" disabled>Save whole file</button>
+                <button class="go" id="save-inc" disabled>Save changes only</button>
               </div>
               <p class="note" style="margin-top: 12px">
-                <b>Append</b> keeps every original byte and adds one index
-                section. <b>Rewrite</b> rebuilds the whole file.
+                <b>Save whole file</b> rebuilds the document from scratch.
+                <b>Save changes only</b> keeps every original byte and adds your
+                edits on the end, so a large file stays quick to save.
               </p>
             </div>
           </section>
@@ -107,36 +105,31 @@
         <div>
           <section class="viewer">
             <div class="viewer-head">
-              <span>Text layer — positions from the engine</span>
-              <span class="who" id="page-count">0 pages</span>
+              <span id="viewer-title">Pages</span>
+              <span class="who" id="page-count">No file open</span>
             </div>
             <div class="pages" id="pages">
               <div class="empty-note">
-                No file open yet. Every box, line and character position on
-                these pages is computed by the content-stream state machine in
-                <b>src/pdf</b>, not by a PDF library.
+                Open a PDF to see its pages here. The text is placed using the
+                real font widths from the file, so what you see lines up with
+                what a PDF reader shows.
               </div>
             </div>
           </section>
 
           <section class="panel" style="margin-top: 22px">
-            <h2>Search every page</h2>
+            <h2>Find text</h2>
             <div class="panel-body">
-              <input
-                type="search"
-                id="q"
-                placeholder="Type a word to find…"
-                disabled
-              />
+              <input type="search" id="q" placeholder="Type a word to find…" disabled />
               <div class="search-out" id="hits"></div>
             </div>
           </section>
 
           <section class="panel">
-            <h2>Bookmarks &amp; page labels</h2>
+            <h2>Contents &amp; page numbers</h2>
             <div class="panel-body tight">
               <div class="scroll-y" id="outline">
-                <p class="note">No file open yet.</p>
+                <p class="note">Open a PDF to see its bookmarks.</p>
               </div>
             </div>
           </section>
@@ -145,74 +138,54 @@
         <!-- ----------------------------------------------------- right -->
         <div>
           <section class="panel">
-            <h2>Object inventory</h2>
+            <h2>Inside the file</h2>
             <div class="panel-body tight">
+              <p class="note">
+                Every part the file is built from. This is why a document that
+                other readers call damaged still opens here.
+              </p>
               <div class="scroll-y" id="inventory">
-                <p class="note">No file open yet.</p>
+                <p class="note">Open a PDF to look inside it.</p>
               </div>
             </div>
           </section>
 
           <section class="panel">
-            <h2>Tier 1 — core engine</h2>
+            <h2>What this app does</h2>
             <div class="panel-body tight">
-              <p class="sub-head">Object parser</p>
+              <p class="sub-head">Opening a file</p>
               <ul class="ticks">
-                <li><span class="box on"></span>xref tables</li>
-                <li><span class="box on"></span>xref streams</li>
-                <li><span class="box on"></span>object streams</li>
-                <li><span class="box on"></span>incremental updates</li>
-                <li><span class="box on"></span>broken-offset repair</li>
-                <li class="todo"><span class="box"></span>encrypted files</li>
+                <li><span class="dot"></span>Reads the file index, compressed streams and fonts</li>
+                <li><span class="dot"></span>Follows every saved revision, newest wins</li>
+                <li><span class="dot"></span>Repairs a file whose index is damaged</li>
               </ul>
-              <p class="sub-head">Object writer</p>
+              <p class="sub-head">Pages</p>
               <ul class="ticks">
-                <li><span class="box on"></span>serialise all 8 types</li>
-                <li><span class="box on"></span>full rewrite</li>
-                <li><span class="box on"></span>incremental append</li>
-                <li><span class="box on"></span>Flate round trip</li>
-                <li class="todo"><span class="box"></span>object streams on write</li>
-                <li class="todo"><span class="box"></span>xref stream on write</li>
-              </ul>
-              <p class="sub-head">Filters</p>
-              <ul class="ticks">
-                <li><span class="box on"></span>FlateDecode</li>
-                <li><span class="box on"></span>LZWDecode</li>
-                <li><span class="box on"></span>ASCIIHexDecode</li>
-                <li><span class="box on"></span>ASCII85Decode</li>
-                <li><span class="box on"></span>RunLengthDecode</li>
-                <li><span class="box on"></span>PNG &amp; TIFF predictors</li>
-                <li class="todo"><span class="box"></span>JBIG2 / CCITT</li>
-              </ul>
-              <p class="sub-head">Page tree</p>
-              <ul class="ticks">
-                <li><span class="box on"></span>inheritance from ancestors</li>
-                <li><span class="box on"></span>insert · delete · reorder</li>
-                <li><span class="box on"></span>rotate · resize · scale content</li>
-                <li><span class="box on"></span>outline &amp; page labels</li>
+                <li><span class="dot"></span>Add, delete, duplicate and reorder</li>
+                <li><span class="dot"></span>Rotate and resize, moving the content with the page</li>
+                <li><span class="dot"></span>Reads the bookmarks and the printed page numbers</li>
               </ul>
               <p class="sub-head">Text</p>
               <ul class="ticks">
-                <li><span class="box on"></span>content-stream state machine</li>
-                <li><span class="box on"></span>glyph positions &amp; widths</li>
-                <li><span class="box on"></span>encodings &amp; ToUnicode</li>
-                <li class="todo"><span class="box"></span>rewrite a text run</li>
+                <li><span class="dot"></span>Search across every page</li>
+                <li><span class="dot"></span>Glyph positions from the file's own font widths</li>
               </ul>
-            </div>
-          </section>
-
-          <section class="panel red">
-            <h2>135 tests green</h2>
-            <div class="panel-body">
-              <p class="note" style="background: var(--yellow)">
-                Fixtures are built by a separate Python writer, so the suite
-                cannot pass by agreeing with itself. Every file is also opened
-                by macOS CoreGraphics as a check that it is a real PDF.
-              </p>
+              <p class="sub-head">Not yet</p>
+              <ul class="ticks">
+                <li><span class="dot off"></span>Scanned pages stay blank, there is no text recognition</li>
+                <li><span class="dot off"></span>Password-protected files open read-only</li>
+                <li><span class="dot off"></span>Images and drawings are not drawn on the preview</li>
+              </ul>
             </div>
           </section>
         </div>
       </div>
+
+      <footer class="colophon">
+        <span>The PDF reader, writer and page engine are written from scratch for this
+        app. No PDF library is used.</span>
+        <span class="count">Checked by an automated test suite</span>
+      </footer>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

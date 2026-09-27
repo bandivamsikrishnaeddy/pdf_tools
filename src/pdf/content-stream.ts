@@ -270,7 +270,14 @@ export interface TextRun {
   x: number;
   y: number;
   width: number;
+  /**
+   * The rendered size of the glyphs, which is the font size multiplied by the
+   * scale in the transformation matrix. A producer may declare a font at 1pt
+   * and scale it up with `cm`, so `fontSize` alone is not the size on screen.
+   */
   height: number;
+  /** Direction of the run, in radians, so a rotated page can be drawn. */
+  angle: number;
   fontName: string;
   fontSize: number;
   ctm: Matrix;
@@ -445,12 +452,21 @@ function showText(bytes: Uint8Array, gs: GraphicsState, runs: TextRun[]): string
   const end = trm.apply(advance, gs.rise);
 
   if (text.length > 0) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    // The size on the page is the font size times the scale in the TEXT matrix
+    // as well as the one in the CTM. A producer that writes a 1pt font and then
+    // scales it with `Tm`, which is very common, puts the whole size there.
+    // Only the y basis is used, because that is the direction glyphs grow in.
+    const textScale = Math.hypot(gs.textMatrix.c, gs.textMatrix.d);
     runs.push({
       text,
       x: start.x,
       y: start.y,
-      width: Math.hypot(end.x - start.x, end.y - start.y),
-      height: gs.fontSize * gs.ctm.scaleFactor(),
+      width: Math.hypot(dx, dy),
+      height: gs.fontSize * gs.horizontalScale * textScale * gs.ctm.scaleFactor(),
+      // A run with no advance has no direction; treat it as upright.
+      angle: dx === 0 && dy === 0 ? 0 : Math.atan2(dy, dx),
       fontName: gs.fontName ?? "",
       fontSize: gs.fontSize,
       ctm: gs.ctm,
