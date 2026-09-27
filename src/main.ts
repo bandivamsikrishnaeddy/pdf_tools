@@ -11,6 +11,7 @@ import { PdfDocument } from "./pdf/document";
 import { PdfWriter } from "./pdf/writer";
 import { PageTree } from "./pdf/page-tree";
 import { isStream } from "./pdf/objects";
+import { search, stepMatch, type Match } from "./pdf/search";
 
 interface Loaded {
   name: string;
@@ -103,6 +104,169 @@ const pageCount = $<HTMLElement>("page-count");
 const verdict = $<HTMLElement>("verdict");
 const viewerTitle = $<HTMLElement>("viewer-title");
 const advice = $<HTMLElement>("advice");
+
+// ------------------------------------------------------------------ search
+
+interface SearchState {
+  query: string;
+  matches: Match[];
+  /** Index into `matches` of the one being shown, or -1 for none. */
+  index: number;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+}
+
+const find: SearchState = { query: "", matches: [], index: -1, caseSensitive: false, wholeWord: false };
+const hitCount = $<HTMLElement>("hit-count");
+const optCase = $<HTMLInputElement>("opt-case");
+const optWord = $<HTMLInputElement>("opt-word");
+const btnPrev = $<HTMLButtonElement>("hit-prev");
+const btnNext = $<HTMLButtonElement>("hit-next");
+
+function runSearch(): void {
+  if (!current) return;
+  const q = find.query.trim();
+  if (q.length < 2) {
+    find.matches = [];
+    find.index = -1;
+  } else {
+    const out = search(current.pages, q, {
+      caseSensitive: find.caseSensitive,
+      wholeWord: find.wholeWord,
+      space: "screen",
+      scale: chooseScale(current.pages),
+    });
+    find.matches = out.matches;
+    find.index = out.matches.length > 0 ? 0 : -1;
+  }
+  renderPages(pageTexts());
+  renderHits();
+}
+
+/** Text of every page, recomputed once and reused by the page renderer. */
+function pageTexts(): string[] {
+  if (!current) return [];
+  const out: string[] = [];
+  for (let i = 0; i < current.pages.count; i++) out.push(current.pages.textOf(i).text);
+  return out;
+}
+
+/** The matches that belong to one page, with the current one marked. */
+function matchesForPage(page: number, index: number): { rects: Match["rects"][]; currentAt: number } {
+  const rects: Match["rects"][] = [];
+  let currentAt = -1;
+  find.matches.forEach((m, i) => {
+    if (m.page !== page) return;
+    if (i === index) currentAt = rects.length;
+    rects.push(m.rects);
+  });
+  return { rects, currentAt };
+}
+
+function renderHits(): void {
+  const total = find.matches.length;
+  hitCount.textContent = total === 0 ? "" : `${find.index + 1} of ${total}`;
+
+  const on = total > 0;
+  btnPrev.disabled = !on || !current;
+  btnNext.disabled = !on || !current;
+
+  hitsEl.replaceChildren();
+  if (find.query.trim().length < 2) return;
+  if (total === 0) {
+    const miss = document.createElement("div");
+    miss.className = "miss";
+    miss.textContent = `No page contains "${find.query.trim()}".`;
+    hitsEl.appendChild(miss);
+    return;
+  }
+
+  let lastPage = -1;
+  const shown = Math.min(total, 300);
+  find.matches.slice(0, shown).forEach((m, i) => {
+    if (m.page !== lastPage) {
+      lastPage = m.page;
+      const g = document.createElement("div");
+      g.className = "group";
+      g.textContent = `Page ${m.page + 1}`;
+      hitsEl.appendChild(g);
+    }
+    const btn = document.createElement("button");
+    btn.className = "hit" + (i === find.index ? " current" : "");
+    const before = escapeHtml(current ? current.pages.textOf(m.page).text.slice(Math.max(0, m.start - 34), m.start) : "");
+    const after = escapeHtml(current ? current.pages.textOf(m.page).text.slice(m.end, m.end + 34) : "");
+    btn.innerHTML = `${before}<mark>${escapeHtml(m.text)}</mark>${after}`;
+    btn.addEventListener("click", () => {
+      find.index = i;
+      renderPages(pageTexts());
+      renderHits();
+      scrollToMatch(m.page);
+    });
+    hitsEl.appendChild(btn);
+  });
+
+  if (total > shown) {
+    const more = document.createElement("div");
+    more.className = "group";
+    more.textContent = `${total - shown} more not listed`;
+    hitsEl.appendChild(more);
+  }
+}
+
+/**
+ * Bring a match into view. Viewers centre the current hit, and only move when
+ * it is not already on screen, so the page does not jump under the reader.
+ */
+function scrollToMatch(page: number): void {
+  const sheet = pagesEl.querySelectorAll<HTMLElement>(".sheet")[page];
+  if (!sheet) return;
+  const box = pagesEl.getBoundingClientRect();
+  const rect = sheet.getBoundingClientRect();
+  const fullyVisible = rect.top >= box.top && rect.bottom <= box.bottom;
+  if (fullyVisible) return;
+  sheet.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+}
+
+function gotoMatch(delta: number): void {
+  if (find.matches.length === 0) return;
+  find.index = stepMatch(find.matches, find.index, delta);
+  renderPages(pageTexts());
+  renderHits();
+  const m = find.matches[find.index];
+  if (m) {
+    scrollToMatch(m.page);
+    const sheet = pagesEl.querySelectorAll<HTMLElement>(".sheet")[m.page];
+    sheet?.classList.add("sel");
+    if (current) current.selected = m.page;
+    syncButtons();
+  }
+}
+
+qEl.addEventListener("input", () => {
+  find.query = qEl.value;
+  runSearch();
+});
+qEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    gotoMatch(e.shiftKey ? -1 : 1);
+  }
+  if (e.key === "Escape") {
+    qEl.value = "";
+    find.query = "";
+    runSearch();
+  }
+});
+btnNext.addEventListener("click", () => gotoMatch(1));
+btnPrev.addEventListener("click", () => gotoMatch(-1));
+optCase.addEventListener("change", () => {
+  find.caseSensitive = optCase.checked;
+  runSearch();
+});
+optWord.addEventListener("change", () => {
+  find.wholeWord = optWord.checked;
+  runSearch();
+});
 
 // ------------------------------------------------------------------ toast
 
@@ -201,13 +365,14 @@ function render(): void {
     if (!isStream(obj)) continue;
     for (const f of filtersOf(obj.dict)) filters.add(f);
   }
-  const perPage: string[] = [];
-  for (let i = 0; i < pages.count; i++) {
-    const t = pages.textOf(i);
-    perPage.push(t.text);
-    runs += t.runs.length;
-    chars += t.text.length;
+  const perPage = pageTexts();
+  for (const t of perPage) {
+    runs += 1;
+    chars += t.length;
   }
+  // Counted properly below, where the runs are actually available.
+  runs = 0;
+  for (let i = 0; i < pages.count; i++) runs += pages.textOf(i).runs.length;
 
   setFacts([
     ["Format version", doc.version],
@@ -256,6 +421,8 @@ function render(): void {
   renderOutline();
   syncButtons();
   qEl.disabled = false;
+  if (find.query.trim().length >= 2) runSearch();
+  else renderHits();
 }
 
 function filtersOf(dict: { get(k: string): unknown }): string[] {
@@ -358,6 +525,28 @@ function drawTextLayer(canvas: HTMLCanvasElement, pageIndex: number, scale: numb
   if (!ctx) return;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Every match on this page is painted, not only the first one. The match
+  // currently being stepped through is a different colour, which is how a
+  // reader tells where they are in the list.
+  const { rects, currentAt } = matchesForPage(pageIndex, find.index);
+  rects.forEach((boxes, i) => {
+    ctx.fillStyle = i === currentAt ? "#f62731" : "#fbe449";
+    for (const r of boxes) {
+      const x = Math.min(r.x0, r.x1);
+      const y = Math.min(r.y0, r.y1);
+      ctx.fillRect(x, y, Math.max(1, r.x1 - r.x0), Math.max(1, r.y1 - r.y0));
+    }
+  });
+  if (currentAt >= 0) {
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 2;
+    for (const r of rects[currentAt] ?? []) {
+      const x = Math.min(r.x0, r.x1);
+      const y = Math.min(r.y0, r.y1);
+      ctx.strokeRect(x, y, Math.max(1, r.x1 - r.x0), Math.max(1, r.y1 - r.y0));
+    }
+  }
 
   const result = current.pages.textOf(pageIndex, scale);
   ctx.fillStyle = "#111111";
@@ -467,40 +656,6 @@ function escapeHtml(s: string): string {
 }
 
 // ----------------------------------------------------------------- search
-
-qEl.addEventListener("input", () => {
-  if (!current) return;
-  const needle = qEl.value.trim().toLowerCase();
-  hitsEl.replaceChildren();
-  if (needle.length < 2) return;
-  const found: Array<{ page: number; before: string; hit: string; after: string }> = [];
-  for (let i = 0; i < current.pages.count; i++) {
-    const text = current.pages.textOf(i).text;
-    const at = text.toLowerCase().indexOf(needle);
-    if (at < 0) continue;
-    found.push({
-      page: i,
-      before: text.slice(Math.max(0, at - 28), at),
-      hit: text.slice(at, at + needle.length),
-      after: text.slice(at + needle.length, at + needle.length + 28),
-    });
-  }
-  if (found.length === 0) {
-    hitsEl.innerHTML = `<div class="miss">No page contains &ldquo;${escapeHtml(needle)}&rdquo;</div>`;
-    return;
-  }
-  hitsEl.insertAdjacentHTML(
-    "beforeend",
-    found
-      .map(
-        (f) =>
-          `<div class="hit">p${f.page + 1} &nbsp;…${escapeHtml(f.before)}` +
-          `<mark style="background:var(--red);color:var(--yellow)">${escapeHtml(f.hit)}</mark>` +
-          `${escapeHtml(f.after)}…</div>`,
-      )
-      .join(""),
-  );
-});
 
 // ------------------------------------------------------------------ actions
 
@@ -649,9 +804,9 @@ window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
     if (!current) return;
-    const perPage: string[] = [];
-    for (let i = 0; i < current.pages.count; i++) perPage.push(current.pages.textOf(i).text);
-    renderPages(perPage);
+    // Highlights are positioned in screen space, so a resize invalidates them.
+    if (find.matches.length > 0) runSearch();
+    else renderPages(pageTexts());
   }, 140);
 });
 

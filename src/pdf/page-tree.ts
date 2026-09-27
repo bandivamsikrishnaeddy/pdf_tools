@@ -299,9 +299,16 @@ export class PageTree {
     page.set("Contents", ref);
   }
 
-  textOf(index: number, scale = 1): TextResult {
+  /**
+   * The page's text with the position of every run.
+   *
+   * By default the positions are in screen space, ready to draw. Pass
+   * `Matrix.identity` to get raw PDF user space instead, which is what an
+   * annotation rectangle has to be written in.
+   */
+  textOf(index: number, scale = 1, baseCtm?: Matrix): TextResult {
     const { matrix } = this.displayMatrix(index, scale);
-    return extractText(this.contentOf(index), this.resources(index), matrix);
+    return extractText(this.contentOf(index), this.resources(index), baseCtm ?? matrix);
   }
 
   // ------------------------------------------------------------ mutations

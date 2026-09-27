@@ -264,6 +264,15 @@ export class GraphicsState {
   }
 }
 
+/** One glyph's box, and the character of the run it draws. */
+export interface GlyphBox {
+  /** Index of this glyph's character in `TextRun.text`. */
+  start: number;
+  x: number;
+  y: number;
+  width: number;
+}
+
 export interface TextRun {
   text: string;
   /** Device-space origin of the run. */
@@ -278,6 +287,12 @@ export interface TextRun {
   height: number;
   /** Direction of the run, in radians, so a rotated page can be drawn. */
   angle: number;
+  /**
+   * One entry per glyph, at the position that glyph actually occupies. A
+   * highlight has to sit under the matched characters, not under the whole
+   * run, and the widths are not equal, so the position cannot be interpolated.
+   */
+  glyphs: GlyphBox[];
   fontName: string;
   fontSize: number;
   ctm: Matrix;
@@ -427,10 +442,15 @@ function showText(bytes: Uint8Array, gs: GraphicsState, runs: TextRun[]): string
   const font = gs.font;
   if (!font) return "";
 
+  // The rendering matrix is fixed before any glyph is placed, so every glyph
+  // box can be measured inside the same loop that reads the bytes.
+  const trm = Matrix.concat(gs.textMatrix, gs.ctm);
+
   // A Type0 font addresses glyphs with two bytes, a simple font with one.
   const twoByte = font.subtype === "Type0";
   let text = "";
   let advance = 0;
+  const glyphs: GlyphBox[] = [];
 
   for (let i = 0; i < bytes.length; ) {
     let code: number;
@@ -443,11 +463,21 @@ function showText(bytes: Uint8Array, gs: GraphicsState, runs: TextRun[]): string
     }
     const w0 = font.widthOf(code);
     const wordSpacing = code === 32 && !twoByte ? gs.wordSpacing : 0;
-    advance += (w0 * gs.fontSize + gs.charSpacing + wordSpacing) * gs.horizontalScale;
+    const step = (w0 * gs.fontSize + gs.charSpacing + wordSpacing) * gs.horizontalScale;
+
+    const a0 = trm.apply(advance, gs.rise);
+    const a1 = trm.apply(advance + step, gs.rise);
+    glyphs.push({
+      start: text.length,
+      x: a0.x,
+      y: a0.y,
+      width: Math.hypot(a1.x - a0.x, a1.y - a0.y),
+    });
+
+    advance += step;
     text += font.textOf(code);
   }
 
-  const trm = Matrix.concat(gs.textMatrix, gs.ctm);
   const start = trm.apply(0, gs.rise);
   const end = trm.apply(advance, gs.rise);
 
@@ -467,6 +497,7 @@ function showText(bytes: Uint8Array, gs: GraphicsState, runs: TextRun[]): string
       height: gs.fontSize * gs.horizontalScale * textScale * gs.ctm.scaleFactor(),
       // A run with no advance has no direction; treat it as upright.
       angle: dx === 0 && dy === 0 ? 0 : Math.atan2(dy, dx),
+      glyphs,
       fontName: gs.fontName ?? "",
       fontSize: gs.fontSize,
       ctm: gs.ctm,

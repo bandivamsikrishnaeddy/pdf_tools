@@ -251,13 +251,20 @@ WHERE TIER 1 ACTUALLY STANDS
   transforms, the page tree with inheritance, and the content-stream state
   machine with glyph positions.
 
-  135 tests pass. The fixtures are written by test/make_fixtures.py, a
-  separate Python implementation, so the suite cannot pass by agreeing with
-  the code it is testing.
+  172 tests pass. The fixtures are written by test/make_fixtures.py, a
+  separate Python implementation, and every one is also opened by macOS
+  CoreGraphics, so the suite cannot pass by agreeing with the code it tests
+  and cannot pass on files that are not real PDFs.
+
+  Added since: per-glyph boxes, so search can highlight the matched
+  characters rather than the whole run, and write a correct annotation
+  rectangle.
 
   Not started: object stream generation on write, xref stream on write,
   font program parsing, outline writing, named destinations, encryption.
 
-  The text extraction already does most of what M10 needs, so search and
-  compare are close behind. The state machine is the base for real text
-  editing, so M6 is not as far off as the list makes it look.
+  Search is done: every occurrence, highlighted in place, with a match
+  counter, next and previous, whole-word and match-case options, and
+  click-through from the result list. Compare (M10) needs a text diff on
+  top of the same boxes, so it is the next thing the state machine gives
+  us almost for free.

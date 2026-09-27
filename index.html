@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>PDF Tools — edit, reorder and search your PDFs</title>
     <meta
       name="description"
@@ -118,9 +119,17 @@
           </section>
 
           <section class="panel" style="margin-top: 22px">
-            <h2>Find text</h2>
+            <h2>Find text <span class="pill" id="hit-count"></span></h2>
             <div class="panel-body">
-              <input type="search" id="q" placeholder="Type a word to find…" disabled />
+              <div class="search-bar">
+                <input type="search" id="q" placeholder="Type a word to find…" disabled />
+                <button id="hit-prev" disabled title="Previous match (Shift+Enter)" aria-label="Previous match">&#9650;</button>
+                <button id="hit-next" disabled title="Next match (Enter)" aria-label="Next match">&#9660;</button>
+              </div>
+              <div class="opts">
+                <label><input type="checkbox" id="opt-case" /><span>Match case</span></label>
+                <label><input type="checkbox" id="opt-word" /><span>Whole word</span></label>
+              </div>
               <div class="search-out" id="hits"></div>
             </div>
           </section>
