@@ -74,20 +74,23 @@ function rectsForRange(
 ): HighlightRect[] {
   const out: HighlightRect[] = [];
   let current: HighlightRect | null = null;
-  // +1 when y grows upward, -1 when it grows downward.
-  const dir = yDown ? -1 : 1;
 
   for (const g of run.glyphs) {
     // A glyph covers the characters [g.start, g.start + n). Touch it when the
     // ranges overlap at all.
     const glyphEnd = g.start + 1;
     if (glyphEnd <= from || g.start >= to) continue;
-    const box: HighlightRect = {
-      x0: g.x,
-      y0: g.y - dir * lineHeight * 0.82,
-      x1: g.x + g.width,
-      y1: g.y + dir * lineHeight * 0.22,
-    };
+    // Nearly all of a highlighter sits OVER the letters, from the ascender line
+    // down to just below the baseline. Only the descenders go under it. Get
+    // this backwards and the word pokes out above its own highlight.
+    const above = lineHeight * 0.78;
+    const below = lineHeight * 0.22;
+    // In screen space y grows downward, so the top of the box is the SMALLER
+    // y. In page space y grows upward, so the top is the LARGER y. Writing it
+    // this way keeps the two cases from being silently swapped.
+    const box: HighlightRect = yDown
+      ? { x0: g.x, y0: g.y - above, x1: g.x + g.width, y1: g.y + below }
+      : { x0: g.x, y0: g.y - below, x1: g.x + g.width, y1: g.y + above };
     if (
       current &&
       Math.abs(current.y0 - box.y0) < 0.6 &&

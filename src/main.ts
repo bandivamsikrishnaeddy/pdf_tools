@@ -557,17 +557,24 @@ function drawTextLayer(canvas: HTMLCanvasElement, pageIndex: number, scale: numb
     // draw its whole page one pixel tall.
     const size = run.height;
     if (size <= 0.5) continue;
-    ctx.save();
-    ctx.translate(run.x, run.y);
-    ctx.rotate(run.angle);
-    // A monospace face stands in for the document's own fonts. The box comes
-    // from the file's real glyph widths, so the fallback face is stretched to
-    // fit it and the text lands where the document says it does.
     ctx.font = `${size}px ui-monospace, Menlo, monospace`;
-    const natural = ctx.measureText(run.text).width;
-    if (natural > 0 && run.width > 0) ctx.scale(run.width / natural, 1);
-    ctx.fillText(run.text, 0, 0);
-    ctx.restore();
+    // Each glyph is drawn at the position the FILE gives it, rather than
+    // laying the run out with a fallback font and stretching it to fit. On a
+    // justified paragraph the two disagree more and more along the line, so a
+    // stretched run puts the words somewhere other than where their highlights
+    // are. A monospace face still stands in for the document's own glyph
+    // shapes; the geometry is the file's.
+    for (let i = 0; i < run.glyphs.length; i++) {
+      const g = run.glyphs[i]!;
+      if (g.width <= 0.01) continue; // a space, nothing to paint
+      // A code can map to no character, or to several. Slice to where the next
+      // glyph begins so a multi-character mapping is drawn whole.
+      const next = run.glyphs[i + 1];
+      const end = next ? next.start : run.text.length;
+      const ch = run.text.slice(g.start, end);
+      if (ch === "") continue;
+      ctx.fillText(ch, g.x, g.y);
+    }
   }
 }
 

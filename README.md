@@ -36,7 +36,7 @@ Node 20 or newer. No other tooling, no native modules, no API keys.
 | Pages | add, delete, duplicate, reorder, rotate, resize, scale content with the page |
 | Structure | bookmarks, printed page labels, inherited page attributes |
 | Text | extracts every run with its real position, widths from the file's own font metrics |
-| Search | every occurrence, highlighted in place, with a counter, next/previous, whole-word and match-case |
+| Search | every occurrence, highlighted in place over the matched glyphs, with a counter, next/previous, whole-word and match-case |
 | Saves | a full rewrite, or an append that leaves every original byte untouched |
 
 ### Not yet
@@ -94,7 +94,7 @@ page full of text reports zero text with no error anywhere.
 
 ## Testing
 
-189 tests, all of them reading real PDF bytes.
+196 tests, all of them reading real PDF bytes.
 
 **The fixtures are not produced by the code under test.** `test/make_fixtures.py`
 is a separate implementation in Python. A suite built from the engine's own
@@ -146,6 +146,8 @@ shown up as a crash.
 | Inherited keys returned unresolved | 26 parts parsed, 0 repairs, 0 characters |
 | Match offsets compared page-wide against run-local glyph indices | every match after the first run found no glyphs, so search reported "no page contains" for words plainly on the page |
 | `Tj` advanced the line matrix as well as the text matrix | every following `T*` started where the last line ended, so text walked diagonally off the page |
+| Highlight box built with inverted signs for the y axis | the box sat mostly *below* the baseline, so a word poked out above its own highlight |
+| Renderer stretched a fallback font across a whole run | on a justified paragraph the words drifted from the glyph positions their highlights were drawn from |
 
 ---
 

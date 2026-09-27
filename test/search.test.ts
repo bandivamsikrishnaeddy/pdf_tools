@@ -128,7 +128,43 @@ describe("search: the rectangle of a match", () => {
     // ascenders, so the top is just past 700 and the bottom is below it.
     expect(rect.y1).toBeGreaterThan(700);
     expect(rect.y0).toBeLessThan(700);
-    expect(rect.y1 - rect.y0).toBeCloseTo(12 * 1.04, 1);
+    expect(rect.y1 - rect.y0).toBeCloseTo(12 * 1.0, 1);
+  });
+
+
+  it("puts most of the box over the letters in page space, where y grows up", () => {
+    const { writer, pages } = tree("simple.pdf");
+    pageSaying(pages, "letters", 700);
+    const size = 12;
+    const rect = search(saveAndReopen(writer).pages, "letters", { space: "page" }).matches[0]!
+      .rects[0]!;
+    // In page space the top of the box is the LARGER y. It reaches most of the
+    // way up to the ascender line and only a little way down to the descenders.
+    expect(rect.y1 - 700).toBeCloseTo(size * 0.78, 1);
+    expect(700 - rect.y0).toBeCloseTo(size * 0.22, 1);
+  });
+
+  it("puts most of the box over the letters in screen space, where y grows down", () => {
+    const { writer, pages } = tree("simple.pdf");
+    pageSaying(pages, "letters", 700);
+    const size = 12;
+    // Screen space flips the axis, so the top of the box is the SMALLER y.
+    const rect = search(saveAndReopen(writer).pages, "letters", { space: "screen" }).matches[0]!
+      .rects[0]!;
+    const baseline = 792 - 700;
+    expect(baseline - rect.y0).toBeCloseTo(size * 0.78, 1);
+    expect(rect.y1 - baseline).toBeCloseTo(size * 0.22, 1);
+  });
+
+  it("keeps the same physical box in both spaces", () => {
+    const { writer, pages } = tree("simple.pdf");
+    pageSaying(pages, "letters", 700);
+    const reopened = saveAndReopen(writer).pages;
+    const page = search(reopened, "letters", { space: "page" }).matches[0]!.rects[0]!;
+    const screen = search(reopened, "letters", { space: "screen" }).matches[0]!.rects[0]!;
+    // Mirrored through the page height, the two have to agree.
+    expect(screen.y0).toBeCloseTo(792 - page.y1, 3);
+    expect(screen.y1).toBeCloseTo(792 - page.y0, 3);
   });
 
   it("reports screen space with y growing downward, for a canvas", () => {

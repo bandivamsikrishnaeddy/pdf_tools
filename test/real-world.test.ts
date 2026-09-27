@@ -150,3 +150,63 @@ describe("the real demo document survives a rewrite", () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The renderer draws each glyph at the position the file gives it, and a
+ * highlight is drawn from those same numbers. If the two can disagree, a
+ * highlight lands beside its word instead of under it, which is what a
+ * fallback font stretched to fit a whole run used to cause.
+ */
+describe("glyph positions line up with the run they belong to", () => {
+  it("advances left to right along the run", () => {
+    const { pages } = open();
+    for (const run of pages.textOf(0).runs) {
+      for (let i = 1; i < run.glyphs.length; i++) {
+        const prev = run.glyphs[i - 1]!;
+        const now = run.glyphs[i]!;
+        // An upright run only. A rotated one legitimately runs the other way.
+        if (Math.abs(run.angle) < 0.01) {
+          expect(now.x).toBeGreaterThanOrEqual(prev.x - 0.01);
+        }
+      }
+    }
+  });
+
+  it("starts at the run origin and ends at the run width", () => {
+    const { pages } = open();
+    for (const run of pages.textOf(0).runs) {
+      const first = run.glyphs[0];
+      const last = run.glyphs[run.glyphs.length - 1];
+      if (!first || !last) continue;
+      expect(first.x).toBeCloseTo(run.x, 3);
+      expect(last.x + last.width).toBeCloseTo(run.x + run.width, 1);
+    }
+  });
+
+  it("puts every glyph inside the run's own box", () => {
+    const { pages } = open();
+    for (const run of pages.textOf(0).runs) {
+      for (const g of run.glyphs) {
+        expect(g.x).toBeGreaterThanOrEqual(run.x - 0.5);
+        expect(g.x + g.width).toBeLessThanOrEqual(run.x + run.width + 0.5);
+        expect(g.y).toBeCloseTo(run.y, 3);
+      }
+    }
+  });
+
+  it("gives every glyph a start index inside the run's text", () => {
+    const { pages } = open();
+    for (const run of pages.textOf(0).runs) {
+      expect(run.glyphs.length).toBeGreaterThan(0);
+      let previous = -1;
+      for (const g of run.glyphs) {
+        // A code can map to no character at all, which is why the glyph count
+        // and the character count need not match. What must hold is that every
+        // glyph starts at or after the previous one, and inside the text.
+        expect(g.start).toBeGreaterThanOrEqual(previous);
+        expect(g.start).toBeLessThanOrEqual(run.text.length);
+        previous = g.start;
+      }
+    }
+  });
+});
